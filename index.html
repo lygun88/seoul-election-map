@@ -21,28 +21,28 @@
   #rankBox { display:none; flex:1; min-height:0; overflow:hidden; background:var(--rank-bg); }
   #rankBox.active { display:flex; flex-direction:column; }
   .rank-toolbar { flex:0 0 auto; background:rgba(255,255,255,.98); border-bottom:1px solid var(--border); padding:10px 12px 12px; box-shadow:0 4px 16px rgba(0,0,0,.06); z-index:2; }
-  .rank-summary { margin:0 0 9px; color:#555; font-size:12px; line-height:1.45; }
+  .rank-summary { margin:0 0 8px; color:#555; font-size:12px; line-height:1.5; }
   .rank-candidate-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; }
-  .rank-candidate-btn { border:1px solid #cfcfcf; background:#fff; color:#222; border-radius:999px; padding:10px 12px; font-weight:900; font-size:13px; box-shadow:0 1px 5px rgba(0,0,0,.04); }
+  .rank-candidate-btn { border:1px solid #cfcfcf; background:#fff; color:#222; border-radius:999px; padding:10px 12px; font-weight:900; font-size:13px; line-height:1.25; box-shadow:0 1px 5px rgba(0,0,0,.04); }
   .rank-candidate-btn.active { color:#fff; box-shadow:0 3px 12px rgba(0,0,0,.13); }
   #rankOh.active { background:var(--oh); border-color:var(--oh); }
   #rankJung.active { background:var(--jung); border-color:var(--jung); }
   #rankOh:not(.active) { color:var(--oh); border-color:rgba(214,59,59,.28); }
   #rankJung:not(.active) { color:var(--jung); border-color:rgba(31,90,166,.28); }
-  .rank-list { flex:1 1 auto; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:8px; padding:12px 12px calc(24px + env(safe-area-inset-bottom)); }
-  .rank-row { position:relative; width:100%; border:1px solid var(--border); background:#fff; border-radius:14px; padding:11px 12px 11px 14px; display:grid; grid-template-columns:44px minmax(0,1fr) auto; gap:9px; align-items:center; text-align:left; box-shadow:0 2px 10px rgba(0,0,0,.045); overflow:hidden; }
-  .rank-row::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:#999; }
+  .rank-list { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:8px; padding:12px 12px calc(36px + env(safe-area-inset-bottom)); overscroll-behavior:contain; }
+  .rank-row { position:relative; width:100%; min-height:64px; height:auto; border:1px solid var(--border); background:#fff; border-radius:14px; padding:11px 12px 11px 16px; display:grid; grid-template-columns:46px minmax(0,1fr) 58px; gap:9px; align-items:start; text-align:left; box-shadow:0 2px 10px rgba(0,0,0,.045); overflow:visible; line-height:1.35; appearance:none; -webkit-appearance:none; }
+  .rank-row::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:4px; border-radius:0 4px 4px 0; background:#999; }
   .rank-row.candidate-oh { border-color:rgba(214,59,59,.20); }
   .rank-row.candidate-jung { border-color:rgba(31,90,166,.20); }
   .rank-row.candidate-oh::before { background:var(--oh); }
   .rank-row.candidate-jung::before { background:var(--jung); }
-  .rank-no { font-weight:900; color:#555; font-size:12px; white-space:nowrap; }
+  .rank-no { display:block; padding-top:2px; font-weight:900; color:#555; font-size:12px; line-height:1.35; white-space:nowrap; }
   .rank-row.candidate-oh .rank-no, .rank-row.candidate-oh .rank-rate { color:var(--oh); }
   .rank-row.candidate-jung .rank-no, .rank-row.candidate-jung .rank-rate { color:var(--jung); }
-  .rank-main { min-width:0; }
-  .rank-main b { display:block; font-size:13.5px; line-height:1.28; word-break:keep-all; overflow-wrap:anywhere; }
-  .rank-main em { display:block; margin-top:3px; color:#666; font-size:11px; line-height:1.25; font-style:normal; }
-  .rank-rate { font-weight:900; font-size:14.5px; white-space:nowrap; }
+  .rank-main { min-width:0; overflow:visible; }
+  .rank-main b { display:block; font-size:13.5px; line-height:1.35; word-break:keep-all; overflow-wrap:anywhere; white-space:normal; }
+  .rank-main em { display:block; margin-top:4px; color:#666; font-size:11px; line-height:1.35; font-style:normal; white-space:normal; }
+  .rank-rate { display:block; padding-top:1px; font-weight:900; font-size:14.5px; line-height:1.35; text-align:right; white-space:nowrap; }
   #map { width:100%; height:100%; display:block; background:#fff; touch-action:none; }
   .legend { position:absolute; right:10px; top:10px; background:var(--panel-bg); border:1px solid var(--border); padding:7px 9px; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,.08); font-size:11px; max-width:172px; z-index:2; }
   .legend-row { display:flex; align-items:center; gap:7px; margin:5px 0; white-space:nowrap; }
@@ -74,17 +74,27 @@
     h1 { font-size:16px; }
     .desc { font-size:11.5px; }
     .legend { top:8px; right:8px; font-size:10.5px; padding:6px 8px; max-width:150px; }
-    .rank-toolbar { padding:9px 10px 10px; }
+    .rank-toolbar { padding:8px 10px 9px; }
+    .rank-summary { margin-bottom:7px; font-size:11.2px; line-height:1.45; }
     .rank-candidate-tabs { gap:7px; }
-    .rank-candidate-btn { padding:9px 10px; font-size:12.5px; }
-    .rank-list { padding:10px 10px calc(22px + env(safe-area-inset-bottom)); gap:7px; }
-    .rank-row { grid-template-columns:38px minmax(0,1fr) auto; padding:10px 10px 10px 13px; border-radius:13px; gap:7px; }
-    .rank-main b { font-size:12.7px; }
-    .rank-rate { font-size:13.2px; }
+    .rank-candidate-btn { padding:9px 10px; font-size:12.5px; line-height:1.25; }
+    .rank-list { padding:10px 10px calc(40px + env(safe-area-inset-bottom)); gap:8px; }
+    .rank-row { grid-template-columns:40px minmax(0,1fr) 54px; min-height:66px; padding:10px 10px 10px 15px; border-radius:13px; gap:7px; }
+    .rank-main b { font-size:12.7px; line-height:1.38; }
+    .rank-main em { font-size:10.8px; line-height:1.35; }
+    .rank-rate { font-size:13.2px; line-height:1.35; }
     .dong-label { font-size:10px; }
     .rate-label, .rate-only { font-size:10.6px; }
     .gu-label { font-size:10.2px; stroke-width:2.7px; }
     .river-label { font-size:9.8px; stroke-width:2.5px; }
+  }
+
+  @media (max-width: 380px) {
+    .rank-row { grid-template-columns:36px minmax(0,1fr) 50px; min-height:68px; padding-right:8px; gap:6px; }
+    .rank-no { font-size:11.5px; }
+    .rank-main b { font-size:12.2px; }
+    .rank-main em { font-size:10.5px; }
+    .rank-rate { font-size:12.8px; }
   }
 </style>
 </head>
