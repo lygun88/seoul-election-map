@@ -16,14 +16,14 @@
   .tabs { display:flex; gap:6px; align-items:center; margin-top:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:1px; }
   .tab-btn { flex:0 0 auto; border:1px solid #bbb; background:#fff; color:#222; border-radius:999px; padding:7px 12px; font-weight:800; font-size:12px; }
   .tab-btn.active { background:#111; color:#fff; border-color:#111; }
-  .toolbar { display:flex; gap:6px; align-items:center; margin-top:6px; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:1px; }
-  .toolbar button { flex:0 0 auto; border:1px solid #bbb; background:#fff; color:#222; border-radius:999px; padding:7px 10px; font-weight:700; font-size:12px; }
-  .toolbar button.active { background:#111; color:#fff; border-color:#111; }
   #mapBox { position:relative; flex:1; min-height:0; }
   #mapBox.hidden { display:none; }
   #rankBox { display:none; flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; padding:10px 12px 24px; background:#fafafa; }
   #rankBox.active { display:block; }
   .rank-summary { margin:0 0 10px; color:#555; font-size:12px; line-height:1.45; }
+  .rank-candidate-tabs { display:flex; gap:6px; margin:0 0 10px; position:sticky; top:0; background:#fafafa; padding-bottom:8px; z-index:1; }
+  .rank-candidate-btn { flex:1; border:1px solid #bbb; background:#fff; color:#222; border-radius:10px; padding:9px 10px; font-weight:900; font-size:13px; }
+  .rank-candidate-btn.active { background:#111; color:#fff; border-color:#111; }
   .rank-list { display:flex; flex-direction:column; gap:6px; }
   .rank-row { width:100%; border:1px solid var(--border); background:#fff; border-radius:10px; padding:9px 10px; display:grid; grid-template-columns:42px 1fr auto; gap:8px; align-items:center; text-align:left; box-shadow:0 1px 8px rgba(0,0,0,.04); }
   .rank-no { font-weight:900; color:#555; font-size:12px; }
@@ -65,9 +65,6 @@
       <button id="tabMap" class="tab-btn active">지도</button>
       <button id="tabRank" class="tab-btn">득표율 순위</button>
     </div>
-    <div class="toolbar" aria-label="라벨 표시">
-      <button id="btnLabelFull" class="active">동명+%</button>
-    </div>
   </header>
   <div id="mapBox">
     <svg id="map"></svg>
@@ -76,8 +73,12 @@
     <div id="infoPanel"><button id="closePanel" aria-label="닫기">×</button><div id="infoBody"></div></div>
     <div class="tooltip" id="tooltip"></div>
   </div>
-  <div id="rankBox" aria-label="동별 1위 후보 득표율 순위">
-    <p class="rank-summary">동별 1위 후보의 득표율을 높은 순서로 정렬했습니다. 행을 누르면 지도에서 해당 동으로 이동합니다.</p>
+  <div id="rankBox" aria-label="후보별 동별 1위 득표율 순위">
+    <p id="rankSummary" class="rank-summary">후보를 선택하면 해당 후보가 1위인 동의 득표율 순위를 볼 수 있습니다. 행을 누르면 지도에서 해당 동으로 이동합니다.</p>
+    <div class="rank-candidate-tabs" aria-label="후보별 순위 선택">
+      <button id="rankOh" class="rank-candidate-btn active" type="button">오세훈 순위</button>
+      <button id="rankJung" class="rank-candidate-btn" type="button">정원오 순위</button>
+    </div>
     <div id="rankList" class="rank-list"></div>
   </div>
 </div>
@@ -103,7 +104,10 @@ const loading = d3.select('#loading');
 const infoPanel = d3.select('#infoPanel');
 const infoBody = d3.select('#infoBody');
 const rankBox = d3.select('#rankBox');
+const rankSummary = d3.select('#rankSummary');
 const rankList = d3.select('#rankList');
+const rankOh = d3.select('#rankOh');
+const rankJung = d3.select('#rankJung');
 const mapBox = d3.select('#mapBox');
 const tabMap = d3.select('#tabMap');
 const tabRank = d3.select('#tabRank');
@@ -128,15 +132,33 @@ function switchTab(tab) {
 }
 d3.select('#tabMap').on('click', () => switchTab('map'));
 d3.select('#tabRank').on('click', () => switchTab('rank'));
+let currentRankCandidate = '오세훈';
+function setRankCandidate(name) {
+  currentRankCandidate = name;
+  rankOh.classed('active', name === '오세훈');
+  rankJung.classed('active', name === '정원오');
+  buildRankList();
+}
+rankOh.on('click', () => setRankCandidate('오세훈'));
+rankJung.on('click', () => setRankCandidate('정원오'));
 function buildRankList() {
-  const rows = DATA.slice().sort((a, b) => d3.descending(a.winnerRate, b.winnerRate));
+  const rows = DATA
+    .filter(d => d.winnerName === currentRankCandidate)
+    .slice()
+    .sort((a, b) => d3.descending(a.winnerRate, b.winnerRate));
+  const title = `${currentRankCandidate} 1위 동 ${rows.length.toLocaleString()}개`;
+  rankSummary.text(`${title}를 득표율 높은 순서로 정렬했습니다. 행을 누르면 지도에서 해당 동으로 이동합니다.`);
   rankList.selectAll('button.rank-row')
     .data(rows, d => d.key)
-    .join('button')
-    .attr('class', 'rank-row')
-    .attr('type', 'button')
-    .html((d, i) => `<span class="rank-no">${i + 1}위</span><span class="rank-main"><b>${d.gu} ${d.dong}</b><em>${d.winnerName} · ${d.winnerParty} · ${d.winnerVotes.toLocaleString()}표</em></span><span class="rank-rate">${d.winnerRate.toFixed(1)}%</span>`)
-    .on('click', (event, d) => focusRegionByData(d));
+    .join(
+      enter => enter.append('button')
+        .attr('class', 'rank-row')
+        .attr('type', 'button')
+        .on('click', (event, d) => focusRegionByData(d)),
+      update => update,
+      exit => exit.remove()
+    )
+    .html((d, i) => `<span class="rank-no">${i + 1}위</span><span class="rank-main"><b>${d.gu} ${d.dong}</b><em>${d.winnerParty} · ${d.winnerVotes.toLocaleString()}표</em></span><span class="rank-rate">${d.winnerRate.toFixed(1)}%</span>`);
 }
 function focusRegionByData(d) {
   const row = featureRows.find(r => r.data && r.data.key === d.key);
@@ -154,13 +176,6 @@ let labelMode = 'full';
 let zoomBehavior;
 let currentTransform = d3.zoomIdentity;
 let featureRows = [];
-const buttons = {full:d3.select('#btnLabelFull')};
-function setLabelMode(mode) {
-  labelMode = mode;
-  Object.entries(buttons).forEach(([k,b]) => b.classed('active', k === mode));
-  updateLabels(currentTransform);
-}
-d3.select('#btnLabelFull').on('click', () => setLabelMode('full'));
 function textWidth(s, size) {
   let w = 0;
   for (const ch of String(s || '')) {
