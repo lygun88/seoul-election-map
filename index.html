@@ -34,6 +34,12 @@
   .legend { position:absolute; right:10px; top:10px; background:var(--panel-bg); border:1px solid var(--border); padding:7px 9px; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,.08); font-size:11px; max-width:172px; z-index:2; }
   .legend-row { display:flex; align-items:center; gap:7px; margin:5px 0; white-space:nowrap; }
   .swatch { width:16px; height:11px; border:1px solid rgba(0,0,0,.45); flex:0 0 auto; }
+  .line-swatch { width:18px; height:0; border-top:3px solid #55aee0; flex:0 0 auto; }
+  .gu-swatch { border-top-color:#2d2d2d; border-top-style:double; }
+  .river-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .gu-boundary-layer path { fill:none; stroke:#2f2f2f; stroke-opacity:.82; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .gu-label { pointer-events:none; font-weight:900; font-size:13px; text-anchor:middle; dominant-baseline:central; fill:rgba(20,20,20,.72); paint-order:stroke; stroke:white; stroke-width:4.2px; stroke-linejoin:round; letter-spacing:-.04em; }
+  .river-label { pointer-events:none; font-weight:900; font-size:12px; text-anchor:middle; dominant-baseline:central; fill:#166d9e; paint-order:stroke; stroke:white; stroke-width:3.4px; stroke-linejoin:round; }
   .label { pointer-events:auto; cursor:pointer; }
   .dong-label { font-weight:800; font-size:10.5px; text-anchor:middle; dominant-baseline:central; paint-order:stroke; stroke:white; stroke-width:3.2px; stroke-linejoin:round; }
   .rate-label { font-weight:900; font-size:11px; text-anchor:middle; dominant-baseline:central; paint-order:stroke; stroke:white; stroke-width:3.3px; stroke-linejoin:round; }
@@ -53,6 +59,8 @@
     .rank-rate { font-size:13px; }
     .dong-label { font-size:10px; }
     .rate-label, .rate-only { font-size:10.6px; }
+    .gu-label { font-size:11px; stroke-width:3.8px; }
+    .river-label { font-size:10px; stroke-width:3px; }
   }
 </style>
 </head>
@@ -60,7 +68,7 @@
 <div id="wrap">
   <header>
     <h1>서울시 행정동별 1위 후보 득표율</h1>
-    <p class="desc">모바일 가독성을 위해 <b>겹치지 않는 라벨만 자동 표시</b>합니다. 안 보이는 동은 확대하거나 지도를 터치하면 하단에 상세가 표시됩니다.</p>
+    <p class="desc">모바일 가독성을 위해 <b>겹치지 않는 라벨만 자동 표시</b>합니다. 한강·주요 하천과 구 경계를 함께 표시해 위치 판별이 쉽도록 보완했습니다.</p>
     <div class="tabs" aria-label="화면 전환">
       <button id="tabMap" class="tab-btn active">지도</button>
       <button id="tabRank" class="tab-btn">득표율 순위</button>
@@ -90,6 +98,58 @@ const candidateOrder = [
   {party:"국민의힘", name:"오세훈"},
   {party:"더불어민주당", name:"정원오"}
 ];
+
+const RIVERS = [
+  {name:'한강', type:'main', labelCoord:[126.995,37.522], coords:[[126.765,37.590],[126.815,37.576],[126.865,37.558],[126.910,37.543],[126.955,37.527],[126.998,37.517],[127.037,37.516],[127.078,37.523],[127.119,37.528],[127.158,37.538],[127.184,37.552]]},
+  {name:'중랑천', type:'stream', labelCoord:[127.064,37.600], coords:[[127.045,37.693],[127.055,37.660],[127.064,37.628],[127.072,37.594],[127.065,37.560],[127.050,37.529],[127.041,37.515]]},
+  {name:'안양천', type:'stream', labelCoord:[126.883,37.512], coords:[[126.866,37.440],[126.872,37.475],[126.878,37.505],[126.884,37.532],[126.894,37.553]]},
+  {name:'탄천', type:'stream', labelCoord:[127.102,37.472], coords:[[127.100,37.494],[127.100,37.474],[127.109,37.452],[127.116,37.435]]},
+  {name:'청계천', type:'stream', labelCoord:[127.021,37.568], coords:[[126.976,37.570],[126.996,37.569],[127.018,37.568],[127.038,37.565],[127.056,37.560]]},
+  {name:'홍제천', type:'stream', labelCoord:[126.923,37.584], coords:[[126.946,37.622],[126.938,37.596],[126.918,37.573],[126.897,37.556]]},
+  {name:'불광천', type:'stream', labelCoord:[126.908,37.599], coords:[[126.916,37.627],[126.912,37.605],[126.904,37.583],[126.892,37.563]]},
+  {name:'양재천', type:'stream', labelCoord:[127.066,37.479], coords:[[127.028,37.473],[127.050,37.476],[127.075,37.485],[127.099,37.493]]},
+  {name:'도림천', type:'stream', labelCoord:[126.906,37.505], coords:[[126.929,37.482],[126.916,37.499],[126.902,37.515],[126.882,37.534]]},
+  {name:'우이천', type:'stream', labelCoord:[127.035,37.650], coords:[[127.012,37.686],[127.024,37.660],[127.040,37.635],[127.056,37.619]]}
+];
+function getGuName(feature) {
+  const parts = String(feature?.properties?.adm_nm || '').split(' ');
+  return parts.length >= 2 ? parts[1] : '기타';
+}
+function coordKey(p) { return `${Number(p[0]).toFixed(6)},${Number(p[1]).toFixed(6)}`; }
+function segmentKey(a, b) {
+  const ka = coordKey(a), kb = coordKey(b);
+  return ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+}
+function addRingSegments(ring, segmentMap) {
+  for (let i = 0; i < ring.length - 1; i++) {
+    const a = ring[i], b = ring[i + 1];
+    if (!a || !b) continue;
+    const key = segmentKey(a, b);
+    if (segmentMap.has(key)) segmentMap.delete(key);
+    else segmentMap.set(key, [a, b]);
+  }
+}
+function addFeatureSegments(feature, segmentMap) {
+  const geom = feature.geometry;
+  if (!geom) return;
+  if (geom.type === 'Polygon') geom.coordinates.forEach(ring => addRingSegments(ring, segmentMap));
+  if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => poly.forEach(ring => addRingSegments(ring, segmentMap)));
+}
+function buildGuBoundaryRows(features, path) {
+  const groups = d3.group(features, getGuName);
+  return Array.from(groups, ([gu, guFeatures]) => {
+    const segmentMap = new Map();
+    guFeatures.forEach(f => addFeatureSegments(f, segmentMap));
+    const collection = {type:'FeatureCollection', features:guFeatures};
+    const c = path.centroid(collection);
+    return {
+      gu,
+      feature:{type:'Feature', properties:{gu}, geometry:{type:'MultiLineString', coordinates:Array.from(segmentMap.values())}},
+      cx:c[0],
+      cy:c[1]
+    };
+  });
+}
 const boundaryUrl = 'https://raw.githubusercontent.com/vuski/admdongkor/master/ver20260401/HangJeongDong_ver20260401.geojson';
 function norm(s) { return String(s || '').replace(/\s+/g,'').replace(/제(?=\d)/g,''); }
 const byKey = new Map();
@@ -111,7 +171,10 @@ const rankJung = d3.select('#rankJung');
 const mapBox = d3.select('#mapBox');
 const tabMap = d3.select('#tabMap');
 const tabRank = d3.select('#tabRank');
-legend.html('<b>범례</b>' + candidateOrder.map(c => `<div class="legend-row"><span class="swatch" style="background:${COLORS[c.party]}"></span>${c.name}</div>`).join(''));
+legend.html('<b>범례</b>'
+  + candidateOrder.map(c => `<div class="legend-row"><span class="swatch" style="background:${COLORS[c.party]}"></span>${c.name}</div>`).join('')
+  + '<div class="legend-row"><span class="line-swatch"></span>한강·주요하천</div>'
+  + '<div class="legend-row"><span class="line-swatch gu-swatch"></span>구 경계</div>');
 function popupHtml(d) {
   if (!d) return '선거 데이터 매칭 없음';
   return `<b>${d.gu} ${d.dong}</b><br>${d.winnerParty} ${d.winnerName}<br>득표율: ${d.winnerRate.toFixed(1)}%<br>득표수: ${d.winnerVotes.toLocaleString()}표<br><span style="color:#666">유효득표: ${d.validVotes.toLocaleString()}표</span>`;
@@ -176,6 +239,10 @@ let labelMode = 'full';
 let zoomBehavior;
 let currentTransform = d3.zoomIdentity;
 let featureRows = [];
+let guRows = [];
+let riverLabelRows = [];
+let guLabelSelection = null;
+let riverLabelSelection = null;
 function textWidth(s, size) {
   let w = 0;
   for (const ch of String(s || '')) {
@@ -232,6 +299,31 @@ function updateLabels(t) {
     sel.select('.rate-label').style('display', labelMode === 'full' ? null : 'none');
     sel.select('.rate-only').style('display', labelMode === 'rate' ? null : 'none');
   });
+  updateReferenceLabels(t);
+}
+function updateReferenceLabels(t) {
+  const width = svg.node().clientWidth;
+  const height = svg.node().clientHeight;
+  const isSmall = width < 720;
+  if (guLabelSelection) {
+    guLabelSelection
+      .attr('transform', r => `translate(${t.applyX(r.cx)},${t.applyY(r.cy)})`)
+      .style('display', r => {
+        const x = t.applyX(r.cx), y = t.applyY(r.cy);
+        return (x < -25 || x > width + 25 || y < -20 || y > height + 20) ? 'none' : null;
+      })
+      .style('opacity', isSmall && t.k < 1.35 ? 0.70 : 0.86);
+  }
+  if (riverLabelSelection) {
+    riverLabelSelection
+      .attr('transform', r => `translate(${t.applyX(r.cx)},${t.applyY(r.cy)})`)
+      .style('display', r => {
+        if (r.type !== 'main' && isSmall && t.k < 2.2) return 'none';
+        if (r.type !== 'main' && !isSmall && t.k < 1.35) return 'none';
+        const x = t.applyX(r.cx), y = t.applyY(r.cy);
+        return (x < -35 || x > width + 35 || y < -25 || y > height + 25) ? 'none' : null;
+      });
+  }
 }
 function render(geo) {
   loading.style('display', 'none');
@@ -243,13 +335,20 @@ function render(geo) {
   const projection = d3.geoMercator().fitSize([width, height], seoul);
   const path = d3.geoPath(projection);
   const mapLayer = svg.append('g').attr('class','map-layer');
+  const dongLayer = mapLayer.append('g').attr('class','dong-layer');
+  const riverLayer = mapLayer.append('g').attr('class','river-layer');
+  const guBoundaryLayer = mapLayer.append('g').attr('class','gu-boundary-layer');
+  const guLabelLayer = svg.append('g').attr('class','gu-label-layer');
+  const riverLabelLayer = svg.append('g').attr('class','river-label-layer');
   const labelLayer = svg.append('g').attr('class','label-layer');
   featureRows = seoul.features.map((f, i) => {
     const c = path.centroid(f);
     const d = byKey.get(norm(f.properties.adm_nm));
     return {id:i, feature:f, data:d, cx:c[0], cy:c[1]};
   });
-  mapLayer.selectAll('path')
+  guRows = buildGuBoundaryRows(seoul.features, path);
+  riverLabelRows = RIVERS.map(r => ({...r, cx:projection(r.labelCoord)[0], cy:projection(r.labelCoord)[1]}));
+  const dongPaths = dongLayer.selectAll('path')
     .data(featureRows)
     .join('path')
     .attr('d', r => path(r.feature))
@@ -263,6 +362,28 @@ function render(geo) {
     })
     .on('mouseleave', () => tooltip.style('opacity', 0))
     .on('click', (event, r) => { event.stopPropagation(); showInfo(r.data); });
+  const riverPaths = riverLayer.selectAll('path')
+    .data(RIVERS)
+    .join('path')
+    .attr('d', r => path({type:'Feature', properties:r, geometry:{type:'LineString', coordinates:r.coords}}))
+    .attr('stroke', r => r.type === 'main' ? '#58b6e6' : '#83c9ee')
+    .attr('stroke-opacity', r => r.type === 'main' ? 0.90 : 0.78)
+    .attr('stroke-width', r => r.type === 'main' ? 4.8 : 2.4);
+  const guBoundaryPaths = guBoundaryLayer.selectAll('path')
+    .data(guRows)
+    .join('path')
+    .attr('d', r => path(r.feature))
+    .attr('stroke-width', 1.45);
+  guLabelSelection = guLabelLayer.selectAll('text.gu-label')
+    .data(guRows)
+    .join('text')
+    .attr('class','gu-label')
+    .text(r => r.gu);
+  riverLabelSelection = riverLabelLayer.selectAll('text.river-label')
+    .data(riverLabelRows)
+    .join('text')
+    .attr('class','river-label')
+    .text(r => r.name);
   const labels = labelLayer.selectAll('g.label')
     .data(featureRows)
     .join('g')
@@ -273,8 +394,11 @@ function render(geo) {
   labels.append('text').attr('class','rate-only').attr('y', 0).attr('fill','#111').text(r => r.data ? `${r.data.winnerRate.toFixed(1)}%` : '');
   zoomBehavior = d3.zoom().scaleExtent([1, 14]).on('zoom', (event) => {
     currentTransform = event.transform;
+    const k = event.transform.k;
     mapLayer.attr('transform', event.transform);
-    mapLayer.selectAll('path').attr('stroke-width', Math.max(0.08, 0.55 / event.transform.k));
+    dongPaths.attr('stroke-width', Math.max(0.08, 0.55 / k));
+    riverPaths.attr('stroke-width', r => (r.type === 'main' ? 4.8 : 2.4) / Math.sqrt(k));
+    guBoundaryPaths.attr('stroke-width', Math.max(0.22, 1.45 / Math.sqrt(k)));
     updateLabels(event.transform);
   });
   svg.call(zoomBehavior).on('click', () => infoPanel.style('display', 'none'));
