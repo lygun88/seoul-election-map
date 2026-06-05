@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes">
 <title>서울시 행정동별 1위 후보 득표율</title>
 <style>
-  :root { --panel-bg: rgba(255,255,255,.96); --border:#d8d8d8; }
+  :root { --panel-bg: rgba(255,255,255,.96); --border:#d8d8d8; --oh:#d63b3b; --jung:#1f5aa6; --rank-bg:#f5f6f8; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','Apple SD Gothic Neo',sans-serif; background:#fafafa; color:#111; }
   body { overflow:hidden; }
@@ -18,18 +18,31 @@
   .tab-btn.active { background:#111; color:#fff; border-color:#111; }
   #mapBox { position:relative; flex:1; min-height:0; }
   #mapBox.hidden { display:none; }
-  #rankBox { display:none; flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; padding:10px 12px 24px; background:#fafafa; }
-  #rankBox.active { display:block; }
-  .rank-summary { margin:0 0 10px; color:#555; font-size:12px; line-height:1.45; }
-  .rank-candidate-tabs { display:flex; gap:6px; margin:0 0 10px; position:sticky; top:0; background:#fafafa; padding-bottom:8px; z-index:1; }
-  .rank-candidate-btn { flex:1; border:1px solid #bbb; background:#fff; color:#222; border-radius:10px; padding:9px 10px; font-weight:900; font-size:13px; }
-  .rank-candidate-btn.active { background:#111; color:#fff; border-color:#111; }
-  .rank-list { display:flex; flex-direction:column; gap:6px; }
-  .rank-row { width:100%; border:1px solid var(--border); background:#fff; border-radius:10px; padding:9px 10px; display:grid; grid-template-columns:42px 1fr auto; gap:8px; align-items:center; text-align:left; box-shadow:0 1px 8px rgba(0,0,0,.04); }
-  .rank-no { font-weight:900; color:#555; font-size:12px; }
-  .rank-main b { display:block; font-size:13px; line-height:1.25; }
-  .rank-main em { display:block; margin-top:2px; color:#666; font-size:11px; font-style:normal; }
-  .rank-rate { font-weight:900; font-size:14px; white-space:nowrap; }
+  #rankBox { display:none; flex:1; min-height:0; overflow:hidden; background:var(--rank-bg); }
+  #rankBox.active { display:flex; flex-direction:column; }
+  .rank-toolbar { flex:0 0 auto; background:rgba(255,255,255,.98); border-bottom:1px solid var(--border); padding:10px 12px 12px; box-shadow:0 4px 16px rgba(0,0,0,.06); z-index:2; }
+  .rank-summary { margin:0 0 9px; color:#555; font-size:12px; line-height:1.45; }
+  .rank-candidate-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; }
+  .rank-candidate-btn { border:1px solid #cfcfcf; background:#fff; color:#222; border-radius:999px; padding:10px 12px; font-weight:900; font-size:13px; box-shadow:0 1px 5px rgba(0,0,0,.04); }
+  .rank-candidate-btn.active { color:#fff; box-shadow:0 3px 12px rgba(0,0,0,.13); }
+  #rankOh.active { background:var(--oh); border-color:var(--oh); }
+  #rankJung.active { background:var(--jung); border-color:var(--jung); }
+  #rankOh:not(.active) { color:var(--oh); border-color:rgba(214,59,59,.28); }
+  #rankJung:not(.active) { color:var(--jung); border-color:rgba(31,90,166,.28); }
+  .rank-list { flex:1 1 auto; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; display:flex; flex-direction:column; gap:8px; padding:12px 12px calc(24px + env(safe-area-inset-bottom)); }
+  .rank-row { position:relative; width:100%; border:1px solid var(--border); background:#fff; border-radius:14px; padding:11px 12px 11px 14px; display:grid; grid-template-columns:44px minmax(0,1fr) auto; gap:9px; align-items:center; text-align:left; box-shadow:0 2px 10px rgba(0,0,0,.045); overflow:hidden; }
+  .rank-row::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:#999; }
+  .rank-row.candidate-oh { border-color:rgba(214,59,59,.20); }
+  .rank-row.candidate-jung { border-color:rgba(31,90,166,.20); }
+  .rank-row.candidate-oh::before { background:var(--oh); }
+  .rank-row.candidate-jung::before { background:var(--jung); }
+  .rank-no { font-weight:900; color:#555; font-size:12px; white-space:nowrap; }
+  .rank-row.candidate-oh .rank-no, .rank-row.candidate-oh .rank-rate { color:var(--oh); }
+  .rank-row.candidate-jung .rank-no, .rank-row.candidate-jung .rank-rate { color:var(--jung); }
+  .rank-main { min-width:0; }
+  .rank-main b { display:block; font-size:13.5px; line-height:1.28; word-break:keep-all; overflow-wrap:anywhere; }
+  .rank-main em { display:block; margin-top:3px; color:#666; font-size:11px; line-height:1.25; font-style:normal; }
+  .rank-rate { font-weight:900; font-size:14.5px; white-space:nowrap; }
   #map { width:100%; height:100%; display:block; background:#fff; touch-action:none; }
   .legend { position:absolute; right:10px; top:10px; background:var(--panel-bg); border:1px solid var(--border); padding:7px 9px; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,.08); font-size:11px; max-width:172px; z-index:2; }
   .legend-row { display:flex; align-items:center; gap:7px; margin:5px 0; white-space:nowrap; }
@@ -61,9 +74,13 @@
     h1 { font-size:16px; }
     .desc { font-size:11.5px; }
     .legend { top:8px; right:8px; font-size:10.5px; padding:6px 8px; max-width:150px; }
-    .rank-row { grid-template-columns:36px 1fr auto; padding:8px 9px; }
-    .rank-main b { font-size:12.5px; }
-    .rank-rate { font-size:13px; }
+    .rank-toolbar { padding:9px 10px 10px; }
+    .rank-candidate-tabs { gap:7px; }
+    .rank-candidate-btn { padding:9px 10px; font-size:12.5px; }
+    .rank-list { padding:10px 10px calc(22px + env(safe-area-inset-bottom)); gap:7px; }
+    .rank-row { grid-template-columns:38px minmax(0,1fr) auto; padding:10px 10px 10px 13px; border-radius:13px; gap:7px; }
+    .rank-main b { font-size:12.7px; }
+    .rank-rate { font-size:13.2px; }
     .dong-label { font-size:10px; }
     .rate-label, .rate-only { font-size:10.6px; }
     .gu-label { font-size:10.2px; stroke-width:2.7px; }
@@ -88,10 +105,12 @@
     <div class="tooltip" id="tooltip"></div>
   </div>
   <div id="rankBox" aria-label="후보별 동별 1위 득표율 순위">
-    <p id="rankSummary" class="rank-summary">후보를 선택하면 해당 후보가 1위인 동의 득표율 순위를 볼 수 있습니다. 행을 누르면 지도에서 해당 동으로 이동합니다.</p>
-    <div class="rank-candidate-tabs" aria-label="후보별 순위 선택">
-      <button id="rankOh" class="rank-candidate-btn active" type="button">오세훈 순위</button>
-      <button id="rankJung" class="rank-candidate-btn" type="button">정원오 순위</button>
+    <div class="rank-toolbar">
+      <p id="rankSummary" class="rank-summary">후보별 1위 행정동을 득표율 높은 순서로 보여줍니다. 행을 누르면 지도에서 해당 동으로 이동합니다.</p>
+      <div class="rank-candidate-tabs" aria-label="후보별 순위 선택">
+        <button id="rankOh" class="rank-candidate-btn active" type="button" aria-pressed="true">오세훈 순위</button>
+        <button id="rankJung" class="rank-candidate-btn" type="button" aria-pressed="false">정원오 순위</button>
+      </div>
     </div>
     <div id="rankList" class="rank-list"></div>
   </div>
@@ -217,9 +236,14 @@ d3.select('#tabRank').on('click', () => switchTab('rank'));
 let currentRankCandidate = '오세훈';
 function setRankCandidate(name) {
   currentRankCandidate = name;
-  rankOh.classed('active', name === '오세훈');
-  rankJung.classed('active', name === '정원오');
+  rankOh.classed('active', name === '오세훈').attr('aria-pressed', name === '오세훈' ? 'true' : 'false');
+  rankJung.classed('active', name === '정원오').attr('aria-pressed', name === '정원오' ? 'true' : 'false');
   buildRankList();
+  const listNode = rankList.node();
+  if (listNode) listNode.scrollTop = 0;
+}
+function rankCandidateClass(name) {
+  return name === '오세훈' ? 'candidate-oh' : 'candidate-jung';
 }
 rankOh.on('click', () => setRankCandidate('오세훈'));
 rankJung.on('click', () => setRankCandidate('정원오'));
@@ -234,12 +258,12 @@ function buildRankList() {
     .data(rows, d => d.key)
     .join(
       enter => enter.append('button')
-        .attr('class', 'rank-row')
         .attr('type', 'button')
         .on('click', (event, d) => focusRegionByData(d)),
       update => update,
       exit => exit.remove()
     )
+    .attr('class', d => `rank-row ${rankCandidateClass(d.winnerName)}`)
     .html((d, i) => `<span class="rank-no">${i + 1}위</span><span class="rank-main"><b>${d.gu} ${d.dong}</b><em>${d.winnerParty} · ${d.winnerVotes.toLocaleString()}표</em></span><span class="rank-rate">${d.winnerRate.toFixed(1)}%</span>`);
 }
 function focusRegionByData(d) {
