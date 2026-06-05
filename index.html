@@ -34,15 +34,17 @@
   .legend { position:absolute; right:10px; top:10px; background:var(--panel-bg); border:1px solid var(--border); padding:7px 9px; border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,.08); font-size:11px; max-width:172px; z-index:2; }
   .legend-row { display:flex; align-items:center; gap:7px; margin:5px 0; white-space:nowrap; }
   .swatch { width:16px; height:11px; border:1px solid rgba(0,0,0,.45); flex:0 0 auto; }
-  .line-swatch { width:18px; height:0; border-top:2px solid #8cc9e5; flex:0 0 auto; }
-  .gu-swatch { border-top-color:#666; border-top-width:1.5px; }
-  .river-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; vector-effect:non-scaling-stroke; }
-  .river-casing { stroke:#ffffff; stroke-opacity:.72; }
-  .river-line { stroke:#8cc9e5; stroke-opacity:.72; }
-  .river-line.main { stroke:#6fb8d8; stroke-opacity:.78; }
-  .gu-boundary-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; vector-effect:non-scaling-stroke; }
-  .gu-boundary-casing { stroke:#fff; stroke-opacity:.58; }
-  .gu-boundary-line { stroke:#555; stroke-opacity:.42; }
+  .line-swatch { width:18px; height:0; border-top:2px solid #92c7dc; flex:0 0 auto; }
+  .gu-swatch { border-top-color:#5b5b5b; border-top-width:1.3px; }
+  .river-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; vector-effect:non-scaling-stroke; shape-rendering:geometricPrecision; }
+  .river-casing { stroke:#ffffff; stroke-opacity:.66; }
+  .river-line { stroke:#92c7dc; stroke-opacity:.70; }
+  .river-line.main { stroke:#70b8d4; stroke-opacity:.76; }
+  .gu-boundary-layer path, .seoul-outline-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; vector-effect:non-scaling-stroke; shape-rendering:geometricPrecision; }
+  .gu-boundary-casing { stroke:#fff; stroke-opacity:.52; }
+  .gu-boundary-line { stroke:#333; stroke-opacity:.30; }
+  .seoul-outline-casing { stroke:#fff; stroke-opacity:.68; }
+  .seoul-outline-line { stroke:#333; stroke-opacity:.38; }
   .gu-label { pointer-events:none; font-weight:700; font-size:11.5px; text-anchor:middle; dominant-baseline:central; fill:rgba(45,45,45,.62); paint-order:stroke; stroke:white; stroke-width:3px; stroke-linejoin:round; letter-spacing:-.045em; }
   .river-label { pointer-events:none; font-weight:800; font-size:10.5px; text-anchor:middle; dominant-baseline:central; fill:#3f90b5; paint-order:stroke; stroke:white; stroke-width:2.8px; stroke-linejoin:round; letter-spacing:-.035em; }
   .label { pointer-events:auto; cursor:pointer; }
@@ -73,7 +75,7 @@
 <div id="wrap">
   <header>
     <h1>서울시 행정동별 1위 후보 득표율</h1>
-    <p class="desc">모바일 가독성을 위해 <b>겹치지 않는 라벨만 자동 표시</b>합니다. 하천과 구 경계는 보조 정보로 은은하게 표시했습니다.</p>
+    <p class="desc">모바일 가독성을 위해 <b>겹치지 않는 라벨만 자동 표시</b>합니다. 하천과 구 경계는 서울 외곽선 안에서만 깔끔하게 표시했습니다.</p>
     <div class="tabs" aria-label="화면 전환">
       <button id="tabMap" class="tab-btn active">지도</button>
       <button id="tabRank" class="tab-btn">득표율 순위</button>
@@ -145,13 +147,20 @@ function addGuSegments(feature, segmentMap) {
     }
   });
 }
-function buildGuBoundaryFeature(features) {
+function buildBoundaryFeatures(features) {
   const segmentMap = new Map();
   features.forEach(f => addGuSegments(f, segmentMap));
-  const boundarySegments = Array.from(segmentMap.values())
-    .filter(item => item.gus.size > 1 || item.count === 1)
+  const values = Array.from(segmentMap.values());
+  const guSegments = values
+    .filter(item => item.gus.size > 1)
     .map(item => item.coords);
-  return {type:'Feature', properties:{name:'서울시 구 경계'}, geometry:{type:'MultiLineString', coordinates:boundarySegments}};
+  const outerSegments = values
+    .filter(item => item.count === 1)
+    .map(item => item.coords);
+  return {
+    gu: {type:'Feature', properties:{name:'자치구 경계'}, geometry:{type:'MultiLineString', coordinates:guSegments}},
+    outer: {type:'Feature', properties:{name:'서울 외곽선'}, geometry:{type:'MultiLineString', coordinates:outerSegments}}
+  };
 }
 function buildGuLabelRows(features, path) {
   const groups = d3.group(features, getGuName);
@@ -162,7 +171,7 @@ function buildGuLabelRows(features, path) {
   });
 }
 function projectedRiverPath(r, projection) {
-  const line = d3.line().curve(d3.curveCatmullRom.alpha(0.45));
+  const line = d3.line().curve(d3.curveCatmullRom.alpha(0.7));
   return line(r.coords.map(c => projection(c)).filter(Boolean));
 }
 const boundaryUrl = 'https://raw.githubusercontent.com/vuski/admdongkor/master/ver20260401/HangJeongDong_ver20260401.geojson';
@@ -349,10 +358,23 @@ function render(geo) {
   const seoul = { type:'FeatureCollection', features: geo.features.filter(f => String(f.properties.adm_nm || '').startsWith('서울특별시')) };
   const projection = d3.geoMercator().fitSize([width, height], seoul);
   const path = d3.geoPath(projection);
+  const clipId = 'seoul-clip-' + Math.random().toString(36).slice(2);
+  const defs = svg.append('defs');
+  defs.append('clipPath')
+    .attr('id', clipId)
+    .attr('clipPathUnits', 'userSpaceOnUse')
+    .selectAll('path')
+    .data(seoul.features)
+    .join('path')
+    .attr('d', path);
   const mapLayer = svg.append('g').attr('class','map-layer');
   const dongLayer = mapLayer.append('g').attr('class','dong-layer');
-  const riverLayer = mapLayer.append('g').attr('class','river-layer');
-  const guBoundaryLayer = mapLayer.append('g').attr('class','gu-boundary-layer');
+  const referenceLayer = mapLayer.append('g')
+    .attr('class','reference-layer')
+    .attr('clip-path', `url(#${clipId})`);
+  const riverLayer = referenceLayer.append('g').attr('class','river-layer');
+  const guBoundaryLayer = referenceLayer.append('g').attr('class','gu-boundary-layer');
+  const seoulOutlineLayer = referenceLayer.append('g').attr('class','seoul-outline-layer');
   const guLabelLayer = svg.append('g').attr('class','gu-label-layer');
   const riverLabelLayer = svg.append('g').attr('class','river-label-layer');
   const labelLayer = svg.append('g').attr('class','label-layer');
@@ -362,7 +384,9 @@ function render(geo) {
     return {id:i, feature:f, data:d, cx:c[0], cy:c[1]};
   });
   guRows = buildGuLabelRows(seoul.features, path);
-  const guBoundaryFeature = buildGuBoundaryFeature(seoul.features);
+  const boundaryFeatures = buildBoundaryFeatures(seoul.features);
+  const guBoundaryFeature = boundaryFeatures.gu;
+  const seoulOutlineFeature = boundaryFeatures.outer;
   riverLabelRows = RIVERS.map(r => ({...r, cx:projection(r.labelCoord)[0], cy:projection(r.labelCoord)[1]}));
   const dongPaths = dongLayer.selectAll('path')
     .data(featureRows)
@@ -383,23 +407,31 @@ function render(geo) {
     .join('path')
     .attr('class', 'river-casing')
     .attr('d', r => projectedRiverPath(r, projection))
-    .attr('stroke-width', r => r.type === 'main' ? 8.6 : 4.2)
+    .attr('stroke-width', r => r.type === 'main' ? 8.0 : 3.8)
     .style('opacity', r => r.type === 'main' ? 1 : .82);
   const riverPaths = riverLayer.selectAll('path.river-line')
     .data(RIVERS)
     .join('path')
     .attr('class', r => r.type === 'main' ? 'river-line main' : 'river-line')
     .attr('d', r => projectedRiverPath(r, projection))
-    .attr('stroke-width', r => r.type === 'main' ? 3.4 : 1.55)
+    .attr('stroke-width', r => r.type === 'main' ? 3.0 : 1.35)
     .style('opacity', r => r.type === 'main' ? 1 : .82);
   const guBoundaryCasing = guBoundaryLayer.append('path')
     .attr('class', 'gu-boundary-casing')
     .attr('d', path(guBoundaryFeature))
-    .attr('stroke-width', 3.2);
+    .attr('stroke-width', 2.7);
   const guBoundaryLine = guBoundaryLayer.append('path')
     .attr('class', 'gu-boundary-line')
     .attr('d', path(guBoundaryFeature))
-    .attr('stroke-width', 1.15);
+    .attr('stroke-width', 0.95);
+  const seoulOutlineCasing = seoulOutlineLayer.append('path')
+    .attr('class', 'seoul-outline-casing')
+    .attr('d', path(seoulOutlineFeature))
+    .attr('stroke-width', 3.0);
+  const seoulOutlineLine = seoulOutlineLayer.append('path')
+    .attr('class', 'seoul-outline-line')
+    .attr('d', path(seoulOutlineFeature))
+    .attr('stroke-width', 1.05);
   guLabelSelection = guLabelLayer.selectAll('text.gu-label')
     .data(guRows)
     .join('text')
@@ -423,10 +455,12 @@ function render(geo) {
     const k = event.transform.k;
     mapLayer.attr('transform', event.transform);
     dongPaths.attr('stroke-width', Math.max(0.08, 0.55 / k));
-    riverCasingPaths.attr('stroke-width', r => r.type === 'main' ? 8.6 : 4.2);
-    riverPaths.attr('stroke-width', r => r.type === 'main' ? 3.4 : 1.55);
-    guBoundaryCasing.attr('stroke-width', 3.2);
-    guBoundaryLine.attr('stroke-width', 1.15);
+    riverCasingPaths.attr('stroke-width', r => r.type === 'main' ? 8.0 : 3.8);
+    riverPaths.attr('stroke-width', r => r.type === 'main' ? 3.0 : 1.35);
+    guBoundaryCasing.attr('stroke-width', 2.7);
+    guBoundaryLine.attr('stroke-width', 0.95);
+    seoulOutlineCasing.attr('stroke-width', 3.0);
+    seoulOutlineLine.attr('stroke-width', 1.05);
     updateLabels(event.transform);
   });
   svg.call(zoomBehavior).on('click', () => infoPanel.style('display', 'none'));
