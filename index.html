@@ -37,9 +37,9 @@
   .line-swatch { width:18px; height:0; border-top:2px solid #92c7dc; flex:0 0 auto; }
   .gu-swatch { border-top-color:#5b5b5b; border-top-width:1.3px; }
   .river-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; vector-effect:non-scaling-stroke; shape-rendering:geometricPrecision; }
-  .river-casing { stroke:#ffffff; stroke-opacity:.66; }
-  .river-line { stroke:#92c7dc; stroke-opacity:.70; }
-  .river-line.main { stroke:#70b8d4; stroke-opacity:.76; }
+  .river-casing { stroke:#ffffff; stroke-opacity:.58; }
+  .river-line { stroke:#8fc7df; stroke-opacity:.62; }
+  .river-line.main { stroke:#75b9d3; stroke-opacity:.68; }
   .gu-boundary-layer path, .seoul-outline-layer path { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; vector-effect:non-scaling-stroke; shape-rendering:geometricPrecision; }
   .gu-boundary-casing { stroke:#fff; stroke-opacity:.52; }
   .gu-boundary-line { stroke:#333; stroke-opacity:.30; }
@@ -75,7 +75,6 @@
 <div id="wrap">
   <header>
     <h1>서울시 행정동별 1위 후보 득표율</h1>
-    <p class="desc">모바일 가독성을 위해 <b>겹치지 않는 라벨만 자동 표시</b>합니다. 하천과 구 경계는 서울 외곽선 안에서만 깔끔하게 표시했습니다.</p>
     <div class="tabs" aria-label="화면 전환">
       <button id="tabMap" class="tab-btn active">지도</button>
       <button id="tabRank" class="tab-btn">득표율 순위</button>
@@ -106,18 +105,8 @@ const candidateOrder = [
   {party:"더불어민주당", name:"정원오"}
 ];
 
-const RIVERS = [
-  {name:'한강', type:'main', labelCoord:[126.995,37.522], coords:[[126.765,37.590],[126.815,37.576],[126.865,37.558],[126.910,37.543],[126.955,37.527],[126.998,37.517],[127.037,37.516],[127.078,37.523],[127.119,37.528],[127.158,37.538],[127.184,37.552]]},
-  {name:'중랑천', type:'stream', labelCoord:[127.064,37.600], coords:[[127.045,37.693],[127.055,37.660],[127.064,37.628],[127.072,37.594],[127.065,37.560],[127.050,37.529],[127.041,37.515]]},
-  {name:'안양천', type:'stream', labelCoord:[126.883,37.512], coords:[[126.866,37.440],[126.872,37.475],[126.878,37.505],[126.884,37.532],[126.894,37.553]]},
-  {name:'탄천', type:'stream', labelCoord:[127.102,37.472], coords:[[127.100,37.494],[127.100,37.474],[127.109,37.452],[127.116,37.435]]},
-  {name:'청계천', type:'stream', labelCoord:[127.021,37.568], coords:[[126.976,37.570],[126.996,37.569],[127.018,37.568],[127.038,37.565],[127.056,37.560]]},
-  {name:'홍제천', type:'stream', labelCoord:[126.923,37.584], coords:[[126.946,37.622],[126.938,37.596],[126.918,37.573],[126.897,37.556]]},
-  {name:'불광천', type:'stream', labelCoord:[126.908,37.599], coords:[[126.916,37.627],[126.912,37.605],[126.904,37.583],[126.892,37.563]]},
-  {name:'양재천', type:'stream', labelCoord:[127.066,37.479], coords:[[127.028,37.473],[127.050,37.476],[127.075,37.485],[127.099,37.493]]},
-  {name:'도림천', type:'stream', labelCoord:[126.906,37.505], coords:[[126.929,37.482],[126.916,37.499],[126.902,37.515],[126.882,37.534]]},
-  {name:'우이천', type:'stream', labelCoord:[127.035,37.650], coords:[[127.012,37.686],[127.024,37.660],[127.040,37.635],[127.056,37.619]]}
-];
+const HANGANG_NORTH_GUS = new Set(['마포구','용산구','성동구','광진구']);
+const HANGANG_SOUTH_GUS = new Set(['강서구','영등포구','동작구','서초구','강남구','송파구','강동구']);
 function getGuName(feature) {
   const parts = String(feature?.properties?.adm_nm || '').split(' ');
   return parts.length >= 2 ? parts[1] : '기타';
@@ -162,6 +151,18 @@ function buildBoundaryFeatures(features) {
     outer: {type:'Feature', properties:{name:'서울 외곽선'}, geometry:{type:'MultiLineString', coordinates:outerSegments}}
   };
 }
+function buildHangangFeature(features) {
+  const segmentMap = new Map();
+  features.forEach(f => addGuSegments(f, segmentMap));
+  const hangangSegments = Array.from(segmentMap.values())
+    .filter(item => {
+      if (item.gus.size < 2) return false;
+      const gus = Array.from(item.gus);
+      return gus.some(g => HANGANG_NORTH_GUS.has(g)) && gus.some(g => HANGANG_SOUTH_GUS.has(g));
+    })
+    .map(item => item.coords);
+  return {type:'Feature', properties:{name:'한강'}, geometry:{type:'MultiLineString', coordinates:hangangSegments}};
+}
 function buildGuLabelRows(features, path) {
   const groups = d3.group(features, getGuName);
   return Array.from(groups, ([gu, guFeatures]) => {
@@ -169,10 +170,6 @@ function buildGuLabelRows(features, path) {
     const c = path.centroid(collection);
     return { gu, cx:c[0], cy:c[1] };
   });
-}
-function projectedRiverPath(r, projection) {
-  const line = d3.line().curve(d3.curveCatmullRom.alpha(0.7));
-  return line(r.coords.map(c => projection(c)).filter(Boolean));
 }
 const boundaryUrl = 'https://raw.githubusercontent.com/vuski/admdongkor/master/ver20260401/HangJeongDong_ver20260401.geojson';
 function norm(s) { return String(s || '').replace(/\s+/g,'').replace(/제(?=\d)/g,''); }
@@ -196,9 +193,7 @@ const mapBox = d3.select('#mapBox');
 const tabMap = d3.select('#tabMap');
 const tabRank = d3.select('#tabRank');
 legend.html('<b>범례</b>'
-  + candidateOrder.map(c => `<div class="legend-row"><span class="swatch" style="background:${COLORS[c.party]}"></span>${c.name}</div>`).join('')
-  + '<div class="legend-row"><span class="line-swatch"></span>한강·주요 하천</div>'
-  + '<div class="legend-row"><span class="line-swatch gu-swatch"></span>구 경계</div>');
+  + candidateOrder.map(c => `<div class="legend-row"><span class="swatch" style="background:${COLORS[c.party]}"></span>${c.name}</div>`).join(''));
 function popupHtml(d) {
   if (!d) return '선거 데이터 매칭 없음';
   return `<b>${d.gu} ${d.dong}</b><br>${d.winnerParty} ${d.winnerName}<br>득표율: ${d.winnerRate.toFixed(1)}%<br>득표수: ${d.winnerVotes.toLocaleString()}표<br><span style="color:#666">유효득표: ${d.validVotes.toLocaleString()}표</span>`;
@@ -387,7 +382,9 @@ function render(geo) {
   const boundaryFeatures = buildBoundaryFeatures(seoul.features);
   const guBoundaryFeature = boundaryFeatures.gu;
   const seoulOutlineFeature = boundaryFeatures.outer;
-  riverLabelRows = RIVERS.map(r => ({...r, cx:projection(r.labelCoord)[0], cy:projection(r.labelCoord)[1]}));
+  const hangangFeature = buildHangangFeature(seoul.features);
+  const hangangRows = hangangFeature.geometry.coordinates.length ? [hangangFeature] : [];
+  riverLabelRows = [];
   const dongPaths = dongLayer.selectAll('path')
     .data(featureRows)
     .join('path')
@@ -403,19 +400,19 @@ function render(geo) {
     .on('mouseleave', () => tooltip.style('opacity', 0))
     .on('click', (event, r) => { event.stopPropagation(); showInfo(r.data); });
   const riverCasingPaths = riverLayer.selectAll('path.river-casing')
-    .data(RIVERS)
+    .data(hangangRows)
     .join('path')
     .attr('class', 'river-casing')
-    .attr('d', r => projectedRiverPath(r, projection))
-    .attr('stroke-width', r => r.type === 'main' ? 8.0 : 3.8)
-    .style('opacity', r => r.type === 'main' ? 1 : .82);
+    .attr('d', path)
+    .attr('stroke-width', 5.4)
+    .style('opacity', .72);
   const riverPaths = riverLayer.selectAll('path.river-line')
-    .data(RIVERS)
+    .data(hangangRows)
     .join('path')
-    .attr('class', r => r.type === 'main' ? 'river-line main' : 'river-line')
-    .attr('d', r => projectedRiverPath(r, projection))
-    .attr('stroke-width', r => r.type === 'main' ? 3.0 : 1.35)
-    .style('opacity', r => r.type === 'main' ? 1 : .82);
+    .attr('class', 'river-line main')
+    .attr('d', path)
+    .attr('stroke-width', 2.1)
+    .style('opacity', .82);
   const guBoundaryCasing = guBoundaryLayer.append('path')
     .attr('class', 'gu-boundary-casing')
     .attr('d', path(guBoundaryFeature))
@@ -455,8 +452,8 @@ function render(geo) {
     const k = event.transform.k;
     mapLayer.attr('transform', event.transform);
     dongPaths.attr('stroke-width', Math.max(0.08, 0.55 / k));
-    riverCasingPaths.attr('stroke-width', r => r.type === 'main' ? 8.0 : 3.8);
-    riverPaths.attr('stroke-width', r => r.type === 'main' ? 3.0 : 1.35);
+    riverCasingPaths.attr('stroke-width', 5.4);
+    riverPaths.attr('stroke-width', 2.1);
     guBoundaryCasing.attr('stroke-width', 2.7);
     guBoundaryLine.attr('stroke-width', 0.95);
     seoulOutlineCasing.attr('stroke-width', 3.0);
